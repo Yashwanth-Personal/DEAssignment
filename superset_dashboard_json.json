@@ -1,0 +1,31 @@
+{
+  "dashboard_title": "CDR Ingestion Overview",
+  "position_json": {},
+  "charts": [
+    {
+      "slice_name": "Ingestion Volume Over Time",
+      "viz_type": "line",
+      "params": {
+        "datasource": "cdr_records__table",
+        "granularity_sqla": "event_time",
+        "time_grain_sqla": "hour",
+        "metrics": ["count"],
+        "adhoc_filters": [],
+        "groupby": [],
+        "time_range": "Last week"
+      }
+    },
+    {
+      "slice_name": "CDR Type Breakdown",
+      "viz_type": "pie",
+      "params": {
+        "datasource": "cdr_records__table",
+        "granularity_sqla": "event_time",
+        "metrics": ["count"],
+        "groupby": ["type"],
+        "adhoc_filters": [],
+        "time_range": "Last week"
+      }
+    }
+  ]
+}
