@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<template>
+  <name>SFTP_To_Kafka_Ingestion</name>
+  <description>NiFi flow to ingest files from SFTP and publish to Kafka</description>
+  <snippet>
+    <processors>
+      <processor>
+        <name>ListSFTP</name>
+        <config>
+          <property name="Hostname">sftp</property>
+          <property name="Port">22</property>
+          <property name="Username">foo</property>
+          <property name="Password">pass</property>
+          <property name="Remote Path">/home/foo/upload</property>
+          <property name="Polling Interval">15 sec</property>
+        </config>
+      </processor>
+      <processor>
+        <name>FetchSFTP</name>
+        <auto-terminated-relationship>failure</auto-terminated-relationship>
+      </processor>
+      <processor>
+        <name>SplitText</name>
+        <config>
+          <property name="Line Count">10000</property>
+        </config>
+      </processor>
+      <processor>
+        <name>UpdateAttribute</name>
+        <config>
+          <property name="topic">cdr_data_topic</property>
+        </config>
+      </processor>
+      <processor>
+        <name>PublishKafkaRecord_2_0</name>
+        <config>
+          <property name="Kafka Brokers">kafka:9092</property>
+          <property name="Topic Name">${topic}</property>
+          <property name="Record Reader">CSVReader</property>
+          <property name="Record Writer">JsonRecordSetWriter</property>
+        </config>
+      </processor>
+    </processors>
+    <connections>
+      <connection>
+        <source>ListSFTP</source>
+        <destination>FetchSFTP</destination>
+      </connection>
+      <connection>
+        <source>FetchSFTP</source>
+        <destination>SplitText</destination>
+      </connection>
+      <connection>
+        <source>SplitText</source>
+        <destination>UpdateAttribute</destination>
+      </connection>
+      <connection>
+        <source>UpdateAttribute</source>
+        <destination>PublishKafkaRecord_2_0</destination>
+      </connection>
+    </connections>
+  </snippet>
+</template>
