@@ -1,0 +1,104 @@
+version: '3.7'
+
+services:
+
+  # ✅ SFTP Server setup for simulating file drops
+  sftp:
+    image: atmoz/sftp
+    container_name: sftp_server
+    volumes:
+      - ./data/sftp/incoming:/home/foo/upload  # Yashwanth: Maps local dir to SFTP upload folder
+    ports:
+      - "2222:22"  # Yashwanth: Exposing SFTP on custom port to avoid conflict
+    command: foo:pass:::upload  # Yashwanth: Simple user setup (foo/pass)
+
+  # ✅ Apache NiFi for ingestion/processing orchestration
+  nifi:
+    image: apache/nifi:latest
+    container_name: nifi
+    ports:
+      - "8080:8080"  # Yashwanth: NiFi Web UI
+    environment:
+      - NIFI_WEB_HTTP_PORT=8080
+    volumes:
+      - ./nifi_data:/opt/nifi/nifi-current  # Yashwanth: Persist NiFi state and flows
+      - ./data/sftp/incoming:/data/incoming  # Yashwanth: So NiFi can access incoming files
+
+  # ✅ Zookeeper - required by Kafka
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes  # Yashwanth: Simplified for local testing
+    ports:
+      - "2181:2181"  # Default ZK port
+
+  # ✅ Apache Kafka for stream processing backbone
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - "9092:9092"  # Yashwanth: Make Kafka reachable locally
+    depends_on:
+      - zookeeper
+
+  # ✅ Kafka UI for topic inspection - extremely useful
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka_ui
+    ports:
+      - "8085:8080"  # Yashwanth: Kafka UI exposed on 8085
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    depends_on:
+      - kafka
+
+  # ✅ PostgreSQL to serve as the reporting database
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=cdr_db  # Yashwanth: Custom DB name for this pipeline
+    volumes:
+      - pgdata:/var/lib/postgresql/data  # Yashwanth: Persist data
+
+  # ✅ Apache Superset for data visualization/dashboarding
+  superset:
+    image: apache/superset
+    container_name: superset
+    environment:
+      - SUPERSET_LOAD_EXAMPLES=no
+      - SUPERSET_SECRET_KEY=supersecret  # Yashwanth: For session handling
+    ports:
+      - "8088:8088"  # Yashwanth: Superset dashboard port
+    depends_on:
+      - postgres
+    volumes:
+      - ./superset_home:/app/superset_home  # Yashwanth: Custom Superset configs
+
+  # ✅ Custom Data Generator (Yashwanth's own module)
+  data-generator:
+    build:
+      context: ./data-generator  # Yashwanth: Local Python-based generator code
+    container_name: data_generator
+    volumes:
+      - ./data/sftp/incoming:/data/sftp/incoming  # Yashwanth: Drop files directly to SFTP
+    depends_on:
+      - sftp
+
+# ✅ Docker-managed volumes for persistent storage
+volumes:
+  pgdata:
+  superset_home:
+  nifi_data:
